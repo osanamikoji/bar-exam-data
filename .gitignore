@@ -2,3 +2,4 @@ __pycache__/
 *.pyc
 scraper.log
 .DS_Store
+chroma_db/
