@@ -1,40 +1,96 @@
 # bar-exam-data
 
-法務省サイトから収集した司法試験・予備試験の全年度データ。
+司法試験・予備試験の全年度データ（問題・解答・出題趣旨・採点実感）をローカルで全文検索できるようにしたリポジトリ。
 
-## 収録内容
+## 背景
+
+法務省が公開している司法試験・予備試験の資料は、年度ごとに個別ページが存在し、横断的な検索手段がない。「憲法で環境権が出た年度は？」「採点実感で繰り返し指摘されている答案の欠点は？」といった問いに答えるには、数十ページを手作業で掘り返す必要があった。
+
+このリポジトリは：
+
+1. 法務省サイトから全年度のPDFをスクレイピングして収集し
+2. pdfplumber でテキスト化して保存し
+3. ChromaDB + Claude API によるローカル RAG 検索を提供する
+
+## 収録データ
 
 | 試験種別 | 年度 | ドキュメント種別 |
-|---------|------|---------------|
-| 予備試験（yobi） | 平成23年〜令和8年 | 試験問題・出題の趣旨・採点実感・正答配点 |
-| 本試験（honshiken） | 平成18年〜令和8年 | 試験問題・出題の趣旨・採点実感・正答配点 |
+|---------|------|----------------|
+| 予備試験 | 平成23年〜令和8年（16年度） | 試験問題・正答配点・出題の趣旨・採点実感 |
+| 本試験   | 平成18年〜令和8年（21年度） | 試験問題・正答配点・出題の趣旨・採点実感 |
+
+PDF 970件・テキストファイル 970件・計 199 MB。
 
 ## ディレクトリ構造
 
 ```
 data/
-  yobi/
+  yobi/           # 予備試験
     reiwa_05/
-      mondai/       # 試験問題 PDF + TXT
-      seito/        # 正答・配点
-      shuppaitsushi/ # 出題の趣旨
-      saitenjikkan/ # 採点実感
-  honshiken/
+      mondai/         # 試験問題 (PDF + TXT)
+      seito/          # 正答・配点
+      shuppaitsushi/  # 出題の趣旨
+      saitenjikkan/   # 採点実感
+  honshiken/      # 本試験
     reiwa_05/
       ...
-manifest.json       # 全ファイルのメタデータ
+manifest.json     # 全ファイルのメタデータ（URL・テキスト文字数など）
 ```
 
-## スクレイパーの実行
+## RAG 検索のセットアップ
+
+### 1. 依存パッケージのインストール
 
 ```bash
-pip install pdfplumber requests beautifulsoup4
+pip install pdfplumber requests beautifulsoup4 chromadb sentence-transformers anthropic
+```
+
+### 2. インデックスの構築（初回のみ・約6分）
+
+```bash
+python3 build_index.py
+```
+
+970件のテキストファイルを 12,025 チャンクに分割し、多言語埋め込みモデル（`paraphrase-multilingual-mpnet-base-v2`）でベクトル化してローカルに保存します。
+
+### 3. 検索
+
+```bash
+export ANTHROPIC_API_KEY="sk-ant-..."
+python3 search.py
+```
+
+```
+✅ インデックス読み込み完了: 12,025 チャンク
+
+🔍 質問> 憲法で環境権が出た年度を教えて
+  検索中...
+  Claude が回答を生成中...
+
+→ 平成18年本試験 論文式・選択科目（環境法）で環境権が明示的に出題...
+  出典: 司法試験（本試験） 平成18年 試験問題 論文式試験（選択科目）
+```
+
+クエリ例：
+- 「採点実感で答案の問題点として繰り返し指摘されていることは？」
+- 「令和5年予備試験 刑法の出題の趣旨を教えて」
+- 「司法試験で表現の自由が論文で問われた年度を全部列挙して」
+
+## データの再収集
+
+法務省サイトから最新データを再スクレイピングする場合：
+
+```bash
 python3 scraper.py
 ```
 
 ## データソース
 
-- 予備試験: https://www.moj.go.jp/jinji/shihoushiken/jinji07_00026.html
-- 本試験: https://www.moj.go.jp/jinji/shihoushiken/jinji08_00025.html
+- 予備試験：https://www.moj.go.jp/jinji/shihoushiken/jinji07_00026.html
+- 本試験：https://www.moj.go.jp/jinji/shihoushiken/jinji08_00025.html
 
-著作権は法務省に帰属します。研究・学習目的での利用に限ります。
+## ライセンス
+
+スクリプト・コードは [MIT License](LICENSE) で公開しています。
+
+収録データの著作権は法務省に帰属します。研究・学習目的での利用に限ります。
